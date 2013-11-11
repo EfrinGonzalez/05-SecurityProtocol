@@ -30,7 +30,8 @@ import javax.xml.bind.JAXBContext;
  */
 public class TaskManagerServer {
 
-    private static String Server_Key_Passcode = "Don't reveal the Secret";
+    private static String Server_Key_Passcode = "Don't reveal the Secret";//K_TS
+    private static String Server_Client_Shared_key_Passcode ="Hey man";//K_SC
     private static int serverPort = 8010;
     private static final String Encoding_Format = "UTF8";
     private static BufferedReader in;
@@ -45,109 +46,72 @@ public class TaskManagerServer {
 
         // hook on to conole input ..
         in = new BufferedReader(new InputStreamReader(System.in));
-
         System.out.println("Please enter the path to taskmanager Xml!");
-
         System.out.println(">");
-
         String path = in.readLine();
-
-
         FileInputStream stream = new FileInputStream(path);
-
         JAXBContext jaxbContext = JAXBContext.newInstance(TaskManager.class);
-
         TaskManager taskManager = (TaskManager) jaxbContext.createUnmarshaller().unmarshal(stream);
-
         System.out.println("Taskmanager loaded with :" + taskManager.tasks.size() + " tasks!");
 
-
         try {
-
             serverSocket = new ServerSocket(serverPort);
-
             System.out.println("Server started at: " + serverPort);
-
             while (true) {
-
                 socket = serverSocket.accept(); // blocking call
-
                 // Data Input and output streams
                 dis = new DataInputStream(socket.getInputStream());
-
-
                 String request = dis.readUTF(); // blocking call
-
                 System.out.println("Received client Request: " + request);
-
                 String[] requestArray = request.split(";");
-
+                
                 if (requestArray.length != 2) {
-                    writeToClient("Invalid request! The format of requst should be [server token];[task-id]");
+                    writeToClient("line 86: Invalid request! The format of request should be [server token];[task-id]"+requestArray.length);
                     continue;
                 }
-
                 String serverTokenPlain;
 
                 try {
                     serverTokenPlain = decryptServerToken(requestArray[0]);
                 } catch (Exception ex) {
-
                     System.out.println(ex.getMessage());
-
                     writeToClient("Failed to decrypt server token! Your request can not be processed!");
-
                     continue;
                 }
 
                 System.out.println("Current Date Time: " + getCurrentDateTime());
                 System.out.println("Decrypted token: " + serverTokenPlain);
-
-
-
                 String[] tokenArray = serverTokenPlain.split(";");
 
-
-                if (tokenArray.length != 2) {
-                    writeToClient("Invalid server token! The Format of server token should be [role];[timestamp]");
+                if (tokenArray.length != 4) {                	
+                    writeToClient("Line112: Invalid server token! The Format of server token should be [role];[timestamp];[clientName]"+"Size of array comming: " + tokenArray.length);                    
                     continue;
                 }
 
                 if (!validateTimestamp(tokenArray[1])) {
-
-                    writeToClient("Timestamp for server token expired! The client request can not be processed!");
+                    writeToClient("Line118: Timestamp for server token expired! The client request can not be processed!");
                     continue;
                 }
 
                 Task requestedtask = GetTask(taskManager, requestArray[1]);
-
                 if (requestedtask == null) {
-
                     writeToClient("Task with Id:" + requestArray[1] + " can not be found in task manager!");
                     continue;
                 }
 
-
-
                 //if (!requestedtask.role.contains(tokenArray[0])) {
                 if (!matchRolemappings(requestedtask.role, tokenArray[0])) {
-
-                    writeToClient("The client is not authorized to execute task with Id:" + requestArray[1] + " due to role mismatch!");
-                    
+                    writeToClient("The client is not authorized to execute task with Id:" + requestArray[1] + " due to role mismatch!");                    
                     continue;
                 }
 
                 // Finnaly if ewverything goes well update the task.
-                requestedtask.status = "executed";
-
-                
-
+                requestedtask.status = "executed";            
                 writeToClient("The task with Id:" + requestArray[1] + " executed successfully!");
 
             }
 
         } catch (Exception ex) {
-
             System.out.println(ex.getMessage());
         }
 
@@ -156,87 +120,56 @@ public class TaskManagerServer {
     }
 
     private static void writeToClient(String message) throws IOException {
-
         DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
-
         dos.writeUTF(message);
-
         dos.flush();
-
     }
 
     private static String decryptServerToken(String serverToken) throws IOException, InvalidKeyException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, FileNotFoundException, IllegalBlockSizeException, BadPaddingException {
         // Format of server token = [role];[timestamp]
         byte[] base64DecodedBytes = Utilities.getBase64DecodedBytes(serverToken);
-
-
         byte[] decryptMessageBytes = DESEncryptionHelper.decryptMessage(Server_Key_Passcode.getBytes(Encoding_Format), base64DecodedBytes);
-
         String serverTokenPlain = Utilities.bytes2String(decryptMessageBytes);
-
         return serverTokenPlain;
-
     }
 
     private static boolean validateTimestamp(String timestamp) {
         try {
             Date expiryDate = formatted.parse(timestamp);
-
             Date now = Calendar.getInstance().getTime();
-
             if (expiryDate.compareTo(now) < 0) {
                 return false;
             }
-
             return true;
-
-
-
         } catch (ParseException ex) {
             return false;
         }
     }
 
     private static Task GetTask(TaskManager taskManager, String taskid) {
-
         ListIterator<Task> listIterator = taskManager.tasks.listIterator();
-
         while (listIterator.hasNext()) {
             Task nextTask = listIterator.next();
-
             if (nextTask.id.equals(taskid)) {
-
                 return nextTask;
             }
         }
-
-
         return null;
     }
 
     private static String getCurrentDateTime() {
-
         Date now = Calendar.getInstance().getTime();
-
         return formatted.format(now);
-
     }
 
     private static boolean matchRolemappings(String taskRoles, String userRoles) {
-
         String[] taskRoleArray = taskRoles.split(",");
-
         String[] userRoleArray = userRoles.split(",");
-
         for (int index = 0; index < taskRoleArray.length; index++) {
-
             for (int index2 = 0; index2 < userRoleArray.length; index2++) {
-
                 if (taskRoleArray[index].trim().equals(userRoleArray[index2].trim())) {
-
                     return true;
                 }
-
             }
         }
         return false;

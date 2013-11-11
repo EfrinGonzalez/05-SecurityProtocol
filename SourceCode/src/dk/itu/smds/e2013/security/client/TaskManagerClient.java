@@ -23,7 +23,8 @@ import javax.crypto.NoSuchPaddingException;
  */
 public class TaskManagerClient {
 
-    private static String Client_TokenService_Key_Passcode = "Topmost Secret";
+    private static String Client_TokenService_Key_Passcode = "Topmost Secret";//K_CT
+    private static String Server_Client_Shared_key_Passcode ="Hey man";//K_SC
     private static final String Encoding_Format = "UTF8";
     private static BufferedReader in;
     private static InetAddress serverAddress;
@@ -34,13 +35,10 @@ public class TaskManagerClient {
     public static void main(String args[]) throws Exception {
 
         serverAddress = InetAddress.getByName("localhost");
-
-
         //Socket socket = null;
         DataInputStream dis;
         ObjectInputStream ois;
         ObjectOutputStream oos;
-
 
         // hook on to conole input ..
         in = new BufferedReader(new InputStreamReader(System.in));
@@ -48,7 +46,6 @@ public class TaskManagerClient {
         RoleBasedToken roleBasedToken = getRoleBasedToken();
 
         if (!roleBasedToken.result) {
-
             System.out.println("Failed to get Role based security token. Error message: "
                     + roleBasedToken.errorMessage
                     + " Enter 'try' to try once again or enter 'exit' to stop the client.");
@@ -141,54 +138,31 @@ public class TaskManagerClient {
 
         try {
             System.out.println("Please enter your ITU username");
-
             System.out.println(">");
-
             String username = in.readLine();
-
             System.out.println("Please enter your password");
-
             System.out.println(">");
-
             String password = in.readLine();
-
             // This is for taking the password in the base64 format, so that other people can't see your password!
             //password = Utilities.bytes2String(Utilities.getBase64DecodedBytes(password));
-
             String encrypteduserNameToken = getUserNameToken(username, password);
 
-
-            // create a connection to token server and write the  encrypted username token
+            // create a connection to token server at port 8008 and write the  encrypted username token
             Socket socket = new Socket(serverAddress, tokenServerPort);
-
             DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
-
             dos.writeUTF(encrypteduserNameToken);
-
             dos.flush();
 
             // open an object stream and get the rolebased security token object.
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
-
             roleTokenObj = (RoleBasedToken) ois.readObject();
-
-
             return roleTokenObj;
-
-
         } catch (IOException | InvalidKeyException | NoSuchAlgorithmException | InvalidKeySpecException | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException | ClassNotFoundException ex) {
 
             roleTokenObj.result = false;
-
             roleTokenObj.errorMessage = "Error in encrypting the username password token. Error message: " + ex.getMessage();
-
             return roleTokenObj;
-
         }
-
-
-
-
     }
 
     private static String getUserNameToken(String username, String password) throws UnsupportedEncodingException, InvalidKeyException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, FileNotFoundException, IOException, IllegalBlockSizeException, BadPaddingException {
